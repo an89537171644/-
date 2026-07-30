@@ -30,15 +30,32 @@ jobs:
       - name: Generate DOCX documents
         run: python generate_article_docs.py
 
-      - name: Install LibreOffice and fonts
+      - name: Install LibreOffice, fonts, and PDF inspection tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y libreoffice-writer fonts-liberation
+          sudo apt-get install -y libreoffice-writer fonts-liberation poppler-utils
 
       - name: Render PDF previews
         run: |
           libreoffice --headless --convert-to pdf --outdir out out/zaklyuchenie_open_publication.docx
           libreoffice --headless --convert-to pdf --outdir out out/uvedomlenie_creation_article.docx
+
+      - name: Build layout quality-assurance report
+        run: |
+          pdfinfo out/zaklyuchenie_open_publication.pdf > out/zaklyuchenie_pdfinfo.txt
+          pdfinfo out/uvedomlenie_creation_article.pdf > out/uvedomlenie_pdfinfo.txt
+          pdftotext -layout out/zaklyuchenie_open_publication.pdf out/zaklyuchenie_layout.txt
+          pdftotext -layout out/uvedomlenie_creation_article.pdf out/uvedomlenie_layout.txt
+          {
+            echo "WORKFLOW_RUN_ID=${GITHUB_RUN_ID}"
+            echo
+            echo "=== CONCLUSION PDF INFO ==="
+            cat out/zaklyuchenie_pdfinfo.txt
+            echo
+            echo "=== NOTIFICATION PDF INFO ==="
+            cat out/uvedomlenie_pdfinfo.txt
+          } > out/qa_report.txt
+          echo "${GITHUB_RUN_ID}" > out/workflow_run_id.txt
 
       - name: Create delivery archive
         run: |
@@ -49,7 +66,20 @@ jobs:
             zaklyuchenie_open_publication.pdf \
             uvedomlenie_creation_article.pdf
 
-      - name: Commit generated documents
+      - name: Upload delivery artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: article-supporting-documents
+          path: |
+            out/zaklyuchenie_open_publication.docx
+            out/uvedomlenie_creation_article.docx
+            out/zaklyuchenie_open_publication.pdf
+            out/uvedomlenie_creation_article.pdf
+            out/article_supporting_documents.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Commit generated documents and QA files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -57,10 +87,16 @@ jobs:
                      out/uvedomlenie_creation_article.docx \
                      out/zaklyuchenie_open_publication.pdf \
                      out/uvedomlenie_creation_article.pdf \
-                     out/article_supporting_documents.zip
+                     out/article_supporting_documents.zip \
+                     out/qa_report.txt \
+                     out/workflow_run_id.txt \
+                     out/zaklyuchenie_layout.txt \
+                     out/uvedomlenie_layout.txt \
+                     out/zaklyuchenie_pdfinfo.txt \
+                     out/uvedomlenie_pdfinfo.txt
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Generate article supporting documents"
+            git commit -m "Generate article supporting documents and QA report"
             git push
           fi
