@@ -1,0 +1,66 @@
+name: Generate article supporting documents
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - generate_article_docs.py
+      - .github/workflows/generate_article_docs.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: python -m pip install --upgrade pip python-docx pillow
+
+      - name: Generate DOCX documents
+        run: python generate_article_docs.py
+
+      - name: Install LibreOffice and fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice-writer fonts-liberation
+
+      - name: Render PDF previews
+        run: |
+          libreoffice --headless --convert-to pdf --outdir out out/zaklyuchenie_open_publication.docx
+          libreoffice --headless --convert-to pdf --outdir out out/uvedomlenie_creation_article.docx
+
+      - name: Create delivery archive
+        run: |
+          cd out
+          zip -9 article_supporting_documents.zip \
+            zaklyuchenie_open_publication.docx \
+            uvedomlenie_creation_article.docx \
+            zaklyuchenie_open_publication.pdf \
+            uvedomlenie_creation_article.pdf
+
+      - name: Commit generated documents
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f out/zaklyuchenie_open_publication.docx \
+                     out/uvedomlenie_creation_article.docx \
+                     out/zaklyuchenie_open_publication.pdf \
+                     out/uvedomlenie_creation_article.pdf \
+                     out/article_supporting_documents.zip
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Generate article supporting documents"
+            git push
+          fi
