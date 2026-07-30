@@ -66,19 +66,6 @@ jobs:
             zaklyuchenie_open_publication.pdf \
             uvedomlenie_creation_article.pdf
 
-      - name: Upload delivery artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: article-supporting-documents
-          path: |
-            out/zaklyuchenie_open_publication.docx
-            out/uvedomlenie_creation_article.docx
-            out/zaklyuchenie_open_publication.pdf
-            out/uvedomlenie_creation_article.pdf
-            out/article_supporting_documents.zip
-          if-no-files-found: error
-          retention-days: 30
-
       - name: Commit generated documents and QA files
         run: |
           git config user.name "github-actions[bot]"
@@ -100,3 +87,17 @@ jobs:
             git commit -m "Generate article supporting documents and QA report"
             git push
           fi
+
+      - name: Upload delivery artifact
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: article-supporting-documents
+          path: |
+            out/zaklyuchenie_open_publication.docx
+            out/uvedomlenie_creation_article.docx
+            out/zaklyuchenie_open_publication.pdf
+            out/uvedomlenie_creation_article.pdf
+            out/article_supporting_documents.zip
+          if-no-files-found: error
+          retention-days: 30
